@@ -140,7 +140,8 @@ class GameScene extends Phaser.Scene {
     spawnObstacles() {
         // Calculate spawn zones with smaller intervals for better vertical distribution
         const spawnZones = [];
-        for (let y = 50; y <= 600; y += 100) {
+        // Doubled the number of zones and reduced the interval for better distribution
+        for (let y = 50; y <= 1200; y += 50) {  // Changed from 600 to 1200 and interval from 100 to 50
             spawnZones.push(this.game.config.height + y);
         }
 
@@ -148,36 +149,42 @@ class GameScene extends Phaser.Scene {
         const existingPositions = new Set();
         let obstaclesSpawned = 0;
 
-        // Spawn static obstacles with better distribution
+        // Spawn static obstacles with better distribution and increased frequency
         spawnZones.forEach(zoneY => {
-            if (Phaser.Math.Between(0, 100) < 70) {
-                let x = Phaser.Math.Between(50, this.game.config.width - 50);
-                if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
-                    existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
-                    const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
-                    // Scale obstacles based on screen size
-                    obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
-                    obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
-                    obstaclesSpawned++;
+            if (Phaser.Math.Between(0, 100) < 85) {  // Increased spawn chance from 70 to 85
+                // Try multiple horizontal positions to ensure better distribution
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    let x = Phaser.Math.Between(50, this.game.config.width - 50);
+                    if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
+                        existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
+                        const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
+                        obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
+                        obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
+                        obstaclesSpawned++;
+                        break;
+                    }
                 }
             }
         });
 
-        // Spawn moving obstacles (skiers)
+        // Spawn moving obstacles (skiers) with increased frequency
         spawnZones.forEach((zoneY, index) => {
-            if (index % 2 === 0 && Phaser.Math.Between(0, 100) < 40) {
-                let x = Phaser.Math.Between(50, this.game.config.width - 50);
-                if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
-                    existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
-                    const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
-                    // Scale skiers based on screen size
-                    obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
-                    obstacle.speed = Phaser.Math.Between(6, 12);
-                    obstacle.setAngle(0);
-                    obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
-                    obstacle.horizontalSpeed = Phaser.Math.Between(-3, 3);
-                    obstacle.nextDirectionChange = 0;
-                    obstaclesSpawned++;
+            if (index % 2 === 0 && Phaser.Math.Between(0, 100) < 60) {  // Increased spawn chance from 40 to 60
+                // Try multiple horizontal positions
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    let x = Phaser.Math.Between(50, this.game.config.width - 50);
+                    if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
+                        existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
+                        const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
+                        obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
+                        obstacle.speed = Phaser.Math.Between(6, 12);
+                        obstacle.setAngle(0);
+                        obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
+                        obstacle.horizontalSpeed = Phaser.Math.Between(-3, 3);
+                        obstacle.nextDirectionChange = 0;
+                        obstaclesSpawned++;
+                        break;
+                    }
                 }
             }
         });
@@ -187,9 +194,9 @@ class GameScene extends Phaser.Scene {
         const gridX = Math.floor(x/50);
         const gridY = Math.floor(y/50);
         
-        // Check a narrower horizontal area but longer vertical area
+        // Reduced horizontal check area but maintained vertical check
         for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -3; dy <= 3; dy++) {
+            for (let dy = -2; dy <= 2; dy++) {  // Reduced from -3/3 to -2/2 to allow closer vertical placement
                 if (existingPositions.has(`${gridX + dx},${gridY + dy}`)) {
                     return true;
                 }
@@ -220,15 +227,15 @@ class GameScene extends Phaser.Scene {
         // Update obstacles
         this.updateObstacles(time);
 
-        // Spawn new obstacles more frequently and check for minimum obstacles
-        if (time % 15 === 0) { // Changed from 27 to 15 for more frequent spawns
+        // Update obstacles spawning frequency
+        if (time % 10 === 0) {  // Changed from 15 to 10 for more frequent spawns
             // Count current obstacles
             const totalObstacles = this.staticObstacles.countActive() + this.movingObstacles.countActive();
             
-            // If too few obstacles, force a spawn
-            if (totalObstacles < 5) {
+            // Increased minimum obstacles from 5 to 10
+            if (totalObstacles < 10) {
                 this.spawnObstacles();
-            } else if (Phaser.Math.Between(0, 100) < 70) { // 70% chance to spawn normally
+            } else if (Phaser.Math.Between(0, 100) < 80) {  // Increased spawn chance from 70 to 80
                 this.spawnObstacles();
             }
         }
