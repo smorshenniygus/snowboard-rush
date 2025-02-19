@@ -9,14 +9,14 @@ class GameScene extends Phaser.Scene {
         this.speed = 7;
         this.speedIncrease = 0.3;
         this.lastSpeedIncrease = 0;
-        this.moveDistance = 40;
+        this.moveDistance = 55;
         this.lastMoveTime = 0;
-        this.moveDelay = 80;
+        this.moveDelay = 90;
         this.isMoving = false;
         this.moveDirection = 0;
-        this.movementSmoothing = 0.25;
-        this.tiltAngle = 15;
-        this.tiltSpeed = 0.2;
+        this.movementSmoothing = 0.3;
+        this.tiltAngle = 20;
+        this.tiltSpeed = 0.25;
     }
 
     preload() {
