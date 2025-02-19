@@ -14,9 +14,11 @@ class GameScene extends Phaser.Scene {
         this.moveDelay = 90;
         this.isMoving = false;
         this.moveDirection = 0;
-        this.movementSmoothing = 0.3;
+        this.movementSmoothing = 0.35;
         this.tiltAngle = 20;
-        this.tiltSpeed = 0.25;
+        this.tiltSpeed = 0.3;
+        this.cameraShake = 0.5;
+        this.lastCameraUpdate = 0;
     }
 
     preload() {
@@ -32,15 +34,18 @@ class GameScene extends Phaser.Scene {
         // Reset game state when starting a new game
         this.resetGameState();
         
-        // Set up scrolling background
+        // Set up scrolling background with smoother movement
         this.background = this.add.tileSprite(0, 0, this.game.config.width, this.game.config.height, 'background');
         this.background.setOrigin(0, 0);
+        this.background.setScrollFactor(0.8);
 
-        // Create player with smaller scale for mobile
+        // Create player with enhanced smoothing
         this.player = this.physics.add.sprite(this.game.config.width / 2, this.game.config.height * 0.2, 'snowboarder');
         this.player.setScale(window.innerWidth < 768 ? 0.8 : 1.5);
         this.player.setAngle(0);
         this.player.setSize(this.player.width * 0.7, this.player.height * 0.7);
+        this.player.setDamping(true);
+        this.player.setDrag(0.95);
 
         // Initialize obstacle groups with physics
         this.staticObstacles = this.physics.add.group();
@@ -151,20 +156,25 @@ class GameScene extends Phaser.Scene {
         if (currentTime - this.lastMoveTime >= this.moveDelay) {
             const targetX = this.player.x + (direction * this.moveDistance);
             if (targetX > 50 && targetX < this.game.config.width - 50) {
-                // Smooth movement using lerp
+                // Enhanced smooth movement using improved lerp
                 this.player.x = Phaser.Math.Linear(
                     this.player.x,
                     targetX,
                     this.movementSmoothing
                 );
 
-                // Add tilt animation
-                const targetAngle = -direction * this.tiltAngle; // Negative for realistic tilt
+                // Smoother tilt animation with easing
+                const targetAngle = -direction * this.tiltAngle;
                 this.player.angle = Phaser.Math.Linear(
                     this.player.angle,
                     targetAngle,
                     this.tiltSpeed
                 );
+
+                // Add subtle camera shake based on movement
+                if (Math.abs(this.player.x - targetX) > 10) {
+                    this.cameras.main.shake(50, this.cameraShake * Math.abs(direction));
+                }
 
                 this.lastMoveTime = currentTime;
             }
@@ -187,12 +197,12 @@ class GameScene extends Phaser.Scene {
 
     spawnObstacles() {
         const isMobile = window.innerWidth < 768;
-        // Calculate spawn zones with balanced intervals
+        // Calculate spawn zones with balanced intervals and increased frequency
         const spawnZones = [];
         // Adjust spawn range and interval based on device and game progress
-        const baseInterval = this.score < 100 ? (isMobile ? 80 : 70) : 
-                           this.score < 300 ? (isMobile ? 60 : 50) : 
-                           (isMobile ? 45 : 40);
+        const baseInterval = this.score < 100 ? (isMobile ? 68 : 60) :
+                           this.score < 300 ? (isMobile ? 51 : 43) :
+                           (isMobile ? 38 : 34);
         
         for (let y = 50; y <= (isMobile ? 800 : 1200); y += baseInterval) {
             spawnZones.push(this.game.config.height + y);
@@ -202,9 +212,9 @@ class GameScene extends Phaser.Scene {
         const existingPositions = new Set();
         let obstaclesSpawned = 0;
 
-        // Base spawn chances that increase with score
-        const baseStaticChance = Math.min(40 + (this.score / 20), 75);
-        const baseMovingChance = Math.min(30 + (this.score / 30), 60);
+        // Increased base spawn chances by ~15-20%
+        const baseStaticChance = Math.min(46 + (this.score / 20), 85);
+        const baseMovingChance = Math.min(35 + (this.score / 30), 70);
 
         // Spawn static obstacles with progressive difficulty
         spawnZones.forEach(zoneY => {
@@ -262,24 +272,33 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        // Continuous smooth movement based on input
+        // Smooth camera follow
+        if (this.player.x !== this.cameras.main.scrollX) {
+            this.cameras.main.scrollX = Phaser.Math.Linear(
+                this.cameras.main.scrollX,
+                this.player.x - this.game.config.width / 2,
+                0.1
+            );
+        }
+
+        // Continuous smooth movement based on input with improved interpolation
         if (this.cursors.left.isDown || (this.isMoving && this.moveDirection === -1)) {
             this.movePlayer(-1);
         } else if (this.cursors.right.isDown || (this.isMoving && this.moveDirection === 1)) {
             this.movePlayer(1);
         } else {
-            // Return to upright position when not moving
+            // Smoother return to upright position
             this.player.angle = Phaser.Math.Linear(
                 this.player.angle,
                 0,
-                this.tiltSpeed
+                this.tiltSpeed * 1.2
             );
         }
 
-        // Scroll background with progressive speed
+        // Scroll background with progressive speed and parallax
         const baseSpeed = 5;
         this.speed = Math.min(baseSpeed + (this.score / 100), 12);
-        this.background.tilePositionY += this.speed;
+        this.background.tilePositionY += this.speed * 0.8;
 
         // Progressive scoring
         if (time - this.lastSpeedIncrease > 1000) {
