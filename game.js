@@ -142,7 +142,7 @@ class GameScene extends Phaser.Scene {
         // Calculate spawn zones with smaller intervals for better vertical distribution
         const spawnZones = [];
         // Adjust spawn range and interval based on device
-        for (let y = 50; y <= (isMobile ? 800 : 1200); y += (isMobile ? 100 : 50)) {  // Reduced mobile interval to 100
+        for (let y = 50; y <= (isMobile ? 800 : 1200); y += (isMobile ? 60 : 50)) {  // Reduced mobile interval to 60 for even more spawn points
             spawnZones.push(this.game.config.height + y);
         }
 
@@ -152,14 +152,14 @@ class GameScene extends Phaser.Scene {
 
         // Spawn static obstacles with better distribution and increased frequency
         spawnZones.forEach(zoneY => {
-            if (Phaser.Math.Between(0, 100) < (isMobile ? 45 : 85)) {  // Increased mobile spawn chance to 45%
+            if (Phaser.Math.Between(0, 100) < (isMobile ? 80 : 85)) {  // Increased mobile spawn chance to 80%
                 // Try multiple horizontal positions to ensure better distribution
-                for (let attempt = 0; attempt < (isMobile ? 2 : 3); attempt++) {  // Increased to 2 attempts on mobile
+                for (let attempt = 0; attempt < (isMobile ? 4 : 3); attempt++) {  // Increased to 4 attempts on mobile
                     let x = Phaser.Math.Between(50, this.game.config.width - 50);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
-                        obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
+                        obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);  // Slightly smaller scale on mobile
                         obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
                         obstaclesSpawned++;
                         break;
@@ -170,14 +170,14 @@ class GameScene extends Phaser.Scene {
 
         // Spawn moving obstacles (skiers) with increased frequency
         spawnZones.forEach((zoneY, index) => {
-            if (index % (isMobile ? 3 : 2) === 0 && Phaser.Math.Between(0, 100) < (isMobile ? 35 : 60)) {  // Increased mobile spawn chance to 35%
+            if (index % (isMobile ? 2 : 2) === 0 && Phaser.Math.Between(0, 100) < (isMobile ? 65 : 60)) {  // Increased mobile spawn chance to 65%
                 // Try multiple horizontal positions
-                for (let attempt = 0; attempt < (isMobile ? 2 : 3); attempt++) {  // Increased to 2 attempts on mobile
+                for (let attempt = 0; attempt < (isMobile ? 3 : 3); attempt++) {  // Increased to 3 attempts on mobile
                     let x = Phaser.Math.Between(50, this.game.config.width - 50);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
-                        obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
+                        obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);  // Slightly smaller scale on mobile
                         obstacle.speed = Phaser.Math.Between(6, 12);
                         obstacle.setAngle(0);
                         obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
@@ -198,7 +198,7 @@ class GameScene extends Phaser.Scene {
         
         // Reduced spacing on mobile to allow more obstacles
         for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -(isMobile ? 3 : 2); dy <= (isMobile ? 3 : 2); dy++) {  // Reduced vertical spacing on mobile
+            for (let dy = -(isMobile ? 1 : 2); dy <= (isMobile ? 1 : 2); dy++) {  // Reduced vertical spacing even further on mobile
                 if (existingPositions.has(`${gridX + dx},${gridY + dy}`)) {
                     return true;
                 }
@@ -231,14 +231,14 @@ class GameScene extends Phaser.Scene {
 
         const isMobile = window.innerWidth < 768;
         // Update obstacles spawning frequency
-        if (time % (isMobile ? 15 : 10) === 0) {  // Increased spawn frequency on mobile
+        if (time % (isMobile ? 8 : 10) === 0) {  // Increased spawn frequency further on mobile
             // Count current obstacles
             const totalObstacles = this.staticObstacles.countActive() + this.movingObstacles.countActive();
             
             // Increased minimum obstacles on mobile
-            if (totalObstacles < (isMobile ? 5 : 10)) {  // Increased minimum obstacles to 5 on mobile
+            if (totalObstacles < (isMobile ? 12 : 10)) {  // Increased minimum obstacles to 12 on mobile
                 this.spawnObstacles();
-            } else if (Phaser.Math.Between(0, 100) < (isMobile ? 45 : 80)) {  // Increased spawn chance to 45% on mobile
+            } else if (Phaser.Math.Between(0, 100) < (isMobile ? 80 : 80)) {  // Increased spawn chance to 80% on mobile
                 this.spawnObstacles();
             }
         }
