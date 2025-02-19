@@ -9,9 +9,12 @@ class GameScene extends Phaser.Scene {
         this.speed = 7;
         this.speedIncrease = 0.3;
         this.lastSpeedIncrease = 0;
-        this.moveDistance = 40;
+        this.moveDistance = 35;
         this.lastMoveTime = 0;
-        this.moveDelay = 150;
+        this.moveDelay = 100;
+        this.isMoving = false;
+        this.moveDirection = 0;
+        this.movementSmoothing = 0.15;
     }
 
     preload() {
@@ -35,7 +38,6 @@ class GameScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(this.game.config.width / 2, this.game.config.height * 0.2, 'snowboarder');
         this.player.setScale(window.innerWidth < 768 ? 0.8 : 1.5);
         this.player.setAngle(0);
-        // Set player collision body size
         this.player.setSize(this.player.width * 0.7, this.player.height * 0.7);
 
         // Initialize obstacle groups with physics
@@ -46,64 +48,95 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.staticObstacles, this.gameOver, null, this);
         this.physics.add.overlap(this.player, this.movingObstacles, this.gameOver, null, this);
 
-        // Set up score display with responsive font size
-        const fontSize = window.innerWidth < 768 ? '24px' : '32px';
-        this.scoreText = this.add.text(16, 16, 'Score: 0', {
+        // Modern iOS-style score display
+        const fontSize = window.innerWidth < 768 ? '28px' : '36px';
+        this.scoreContainer = this.add.container(16, 16);
+        
+        // Score background with blur effect
+        const scoreBg = this.add.rectangle(0, 0, 160, 50, 0x000000, 0.4)
+            .setOrigin(0, 0)
+            .setAlpha(0.8);
+        scoreBg.postFX.addBlur(1, 1, 1, 0.1);
+        
+        this.scoreText = this.add.text(80, 25, 'Score: 0', {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
             fontSize: fontSize,
-            fill: '#fff',
-            stroke: '#000',
-            strokeThickness: 4,
-            shadowColor: '#000',
-            shadowBlur: 4,
-            shadowOffsetX: 2,
-            shadowOffsetY: 2
-        });
+            fontWeight: '600',
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+            shadow: {
+                offsetX: 1,
+                offsetY: 1,
+                color: '#000000',
+                blur: 3,
+                fill: true
+            }
+        }).setOrigin(0.5);
 
-        // Add control buttons for mobile with improved styling
-        const buttonSize = window.innerWidth < 768 ? 50 : 60;
-        const buttonY = this.game.config.height - (window.innerWidth < 768 ? 70 : 80);
-        const buttonStyle = {
-            fontSize: window.innerWidth < 768 ? '36px' : '48px',
-            fill: '#fff',
-            backgroundColor: '#000000aa',
-            padding: { x: 15, y: 8 },
-            fixedWidth: buttonSize,
-            fixedHeight: buttonSize,
-            align: 'center',
-            shadow: { blur: 4, color: '#000000', fill: true },
-            stroke: '#ffffff',
-            strokeThickness: 2
+        this.scoreContainer.add([scoreBg, this.scoreText]);
+
+        // Modern iOS-style control buttons
+        const buttonSize = window.innerWidth < 768 ? 70 : 80;
+        const buttonY = this.game.config.height - (window.innerWidth < 768 ? 100 : 120);
+        
+        // Create button container for visual effects
+        const createButton = (x, text, direction) => {
+            const container = this.add.container(x, buttonY);
+            
+            // Button background with blur effect
+            const bg = this.add.circle(0, 0, buttonSize/2, 0xFFFFFF, 0.15)
+                .setInteractive();
+            bg.postFX.addBlur(1, 1, 1, 0.1);
+            
+            // Button border
+            const border = this.add.circle(0, 0, buttonSize/2, 0xFFFFFF, 0.3);
+            border.setStrokeStyle(2, 0xFFFFFF, 0.5);
+            
+            // Button text with iOS-style font
+            const txt = this.add.text(0, 0, text, {
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: window.innerWidth < 768 ? '36px' : '48px',
+                fontWeight: 'bold',
+                fill: '#ffffff',
+                stroke: '#ffffff',
+                strokeThickness: 1
+            }).setOrigin(0.5);
+            
+            container.add([bg, border, txt]);
+            
+            // Enhanced touch feedback
+            bg.on('pointerdown', () => {
+                this.moveDirection = direction;
+                this.isMoving = true;
+                container.setScale(0.9);
+                bg.setFillStyle(0xFFFFFF, 0.3);
+            });
+            
+            bg.on('pointerup', () => {
+                this.isMoving = false;
+                this.moveDirection = 0;
+                container.setScale(1);
+                bg.setFillStyle(0xFFFFFF, 0.15);
+            });
+            
+            bg.on('pointerout', () => {
+                this.isMoving = false;
+                this.moveDirection = 0;
+                container.setScale(1);
+                bg.setFillStyle(0xFFFFFF, 0.15);
+            });
+            
+            return container;
         };
 
-        this.leftButton = this.add.text(40, buttonY, '←', buttonStyle)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setAlpha(0.8);
-        
-        this.rightButton = this.add.text(this.game.config.width - 90, buttonY, '→', buttonStyle)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setAlpha(0.8);
-
-        // Add button controls with hover effects
-        this.leftButton.on('pointerdown', () => {
-            this.leftButton.setAlpha(1);
-            this.movePlayer(-1);
-        });
-        this.leftButton.on('pointerup', () => this.leftButton.setAlpha(0.8));
-        this.leftButton.on('pointerout', () => this.leftButton.setAlpha(0.8));
-
-        this.rightButton.on('pointerdown', () => {
-            this.rightButton.setAlpha(1);
-            this.movePlayer(1);
-        });
-        this.rightButton.on('pointerup', () => this.rightButton.setAlpha(0.8));
-        this.rightButton.on('pointerout', () => this.rightButton.setAlpha(0.8));
+        this.leftButton = createButton(buttonSize, '←', -1);
+        this.rightButton = createButton(this.game.config.width - buttonSize, '→', 1);
 
         // Set up keyboard controls
         this.cursors = this.input.keyboard.createCursorKeys();
-
-        // Keep touch input for swipes
+        
+        // Enhanced touch input for swipes
         this.input.on('pointerdown', this.startSwipe, this);
         this.input.on('pointerup', this.endSwipe, this);
 
@@ -113,11 +146,15 @@ class GameScene extends Phaser.Scene {
 
     movePlayer(direction) {
         const currentTime = new Date().getTime();
-        // Check if enough time has passed since last move
         if (currentTime - this.lastMoveTime >= this.moveDelay) {
-            const newX = this.player.x + (direction * this.moveDistance);
-            if (newX > 50 && newX < this.game.config.width - 50) {
-                this.player.x = newX;
+            const targetX = this.player.x + (direction * this.moveDistance);
+            if (targetX > 50 && targetX < this.game.config.width - 50) {
+                // Smooth movement using lerp
+                this.player.x = Phaser.Math.Linear(
+                    this.player.x,
+                    targetX,
+                    this.movementSmoothing
+                );
                 this.lastMoveTime = currentTime;
             }
         }
@@ -214,10 +251,10 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        // Handle keyboard input
-        if (this.cursors.left.isDown) {
+        // Continuous smooth movement based on input
+        if (this.cursors.left.isDown || (this.isMoving && this.moveDirection === -1)) {
             this.movePlayer(-1);
-        } else if (this.cursors.right.isDown) {
+        } else if (this.cursors.right.isDown || (this.isMoving && this.moveDirection === 1)) {
             this.movePlayer(1);
         }
 
@@ -426,117 +463,95 @@ class GameOverScene extends Phaser.Scene {
         const { width, height } = this.game.config;
         const isMobile = window.innerWidth < 768;
 
-        // Modern semi-transparent overlay
-        this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
-            .setOrigin(0)
-            .setAlpha(0);
-        this.tweens.add({
-            targets: this.children.list[0],
-            alpha: 0.7,
-            duration: 500,
-            ease: 'Power2'
-        });
+        // iOS-style blur background
+        const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
+            .setOrigin(0);
+        bg.postFX.addBlur(2, 2, 1, 0.1);
 
-        // Game Over text with animation
-        const gameOverText = this.add.text(width / 2, height * 0.3, 'Game Over', {
-            fontFamily: 'Inter, sans-serif',
-            fontSize: isMobile ? '48px' : '64px',
+        // Modern container for content
+        const container = this.add.container(width / 2, height * 0.2);
+        
+        // Game Over text with iOS typography
+        const gameOverText = this.add.text(0, 0, 'Game Over', {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: isMobile ? '42px' : '56px',
             fontWeight: 'bold',
             fill: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 6,
-            shadow: {
-                offsetX: 3,
-                offsetY: 3,
-                color: '#000000',
-                blur: 8,
-                fill: true
-            }
-        }).setOrigin(0.5).setAlpha(0);
-
-        // Animate game over text
-        this.tweens.add({
-            targets: gameOverText,
-            y: height * 0.25,
-            alpha: 1,
-            duration: 800,
-            ease: 'Back.out'
-        });
-
-        // Score display with animation
-        const scoreText = this.add.text(width / 2, height * 0.4, `Score: ${this.score}`, {
-            fontFamily: 'Inter, sans-serif',
-            fontSize: isMobile ? '32px' : '48px',
-            fontWeight: '600',
-            fill: '#ffffff',
-            stroke: '#000000',
             strokeThickness: 4
-        }).setOrigin(0.5).setAlpha(0);
+        }).setOrigin(0.5);
 
-        this.tweens.add({
-            targets: scoreText,
-            alpha: 1,
-            scale: 1.2,
-            duration: 600,
-            delay: 400,
-            ease: 'Back.out'
-        });
+        // Score display with iOS-style design
+        const scoreText = this.add.text(0, 80, `Score: ${this.score}`, {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: isMobile ? '32px' : '42px',
+            fontWeight: '600',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
 
-        // Create modern buttons
-        const createButton = (text, y, color, delay) => {
-            const button = this.add.container(width / 2, y);
+        container.add([gameOverText, scoreText]);
+
+        // Create iOS-style buttons
+        const createButton = (text, y, color) => {
+            const button = this.add.container(0, y);
             
-            // Button background
-            const bg = this.add.rectangle(0, 0, isMobile ? 200 : 250, isMobile ? 50 : 60, color)
-                .setOrigin(0.5)
-                .setAlpha(0.9);
+            // Button background with blur effect
+            const bg = this.add.rectangle(0, 0, isMobile ? 200 : 250, isMobile ? 50 : 60, color, 0.9)
+                .setInteractive();
+            bg.postFX.addBlur(1, 1, 1, 0.1);
             
             // Button text
             const txt = this.add.text(0, 0, text, {
-                fontFamily: 'Inter, sans-serif',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
                 fontSize: isMobile ? '20px' : '24px',
-                fontWeight: 'bold',
+                fontWeight: '600',
                 fill: '#ffffff'
             }).setOrigin(0.5);
 
             button.add([bg, txt]);
-            button.setAlpha(0);
             
-            // Add hover effects
-            bg.setInteractive()
-                .on('pointerover', () => this.tweens.add({
+            // iOS-style touch feedback
+            bg.on('pointerdown', () => {
+                this.tweens.add({
                     targets: button,
-                    scale: 1.05,
-                    duration: 200
-                }))
-                .on('pointerout', () => this.tweens.add({
+                    scale: 0.95,
+                    duration: 100
+                });
+            });
+            
+            bg.on('pointerup', () => {
+                this.tweens.add({
                     targets: button,
                     scale: 1,
-                    duration: 200
-                }));
-
-            // Animate button appearance
-            this.tweens.add({
-                targets: button,
-                alpha: 1,
-                y: y - 10,
-                duration: 500,
-                delay: delay,
-                ease: 'Back.out'
+                    duration: 100
+                });
+            });
+            
+            bg.on('pointerout', () => {
+                this.tweens.add({
+                    targets: button,
+                    scale: 1,
+                    duration: 100
+                });
             });
 
             return button;
         };
 
-        // Add buttons with different colors and animations
-        const playAgainButton = createButton('Play Again', height * 0.6, 0x2ecc71, 600);
-        const saveScoreButton = createButton('Save Score', height * 0.7, 0x3498db, 800);
-        const leaderboardButton = createButton('Leaderboard', height * 0.8, 0x9b59b6, 1000);
+        // Add modern styled buttons
+        const buttonSpacing = isMobile ? 70 : 80;
+        const startY = height * 0.45;
+        
+        const playButton = createButton('Play Again', startY, 0x34C759);
+        const saveButton = createButton('Save Score', startY + buttonSpacing, 0x007AFF);
+        const leaderButton = createButton('Leaderboard', startY + buttonSpacing * 2, 0x5856D6);
+
+        container.add([playButton, saveButton, leaderButton]);
 
         // Add button functionality
-        playAgainButton.list[0].on('pointerdown', () => this.scene.start('GameScene'));
-        saveScoreButton.list[0].on('pointerdown', () => this.scene.start('NameInputScene', { score: this.score }));
-        leaderboardButton.list[0].on('pointerdown', () => this.scene.start('LeaderboardScene'));
+        playButton.list[0].on('pointerup', () => this.scene.start('GameScene'));
+        saveButton.list[0].on('pointerup', () => this.scene.start('NameInputScene', { score: this.score }));
+        leaderButton.list[0].on('pointerup', () => this.scene.start('LeaderboardScene'));
     }
 }
 
@@ -548,84 +563,140 @@ class LeaderboardScene extends Phaser.Scene {
     create() {
         const { width, height } = this.game.config;
         const isMobile = window.innerWidth < 768;
-        const fontSize = isMobile ? '36px' : '48px';
-        const scoreFontSize = isMobile ? '20px' : '24px';
 
-        // Semi-transparent background
-        this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0);
+        // iOS-style blur background
+        const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
+            .setOrigin(0);
+        bg.postFX.addBlur(2, 2, 1, 0.1);
 
-        // Title with glow effect
-        this.add.text(width / 2, 50, 'Leaderboard', {
-            fontSize: fontSize,
-            fill: '#fff',
-            stroke: '#000',
-            strokeThickness: 6,
-            shadow: { blur: 8, color: '#9b59b6', fill: true }
+        // Modern title with iOS typography
+        const title = this.add.text(width / 2, 40, 'Leaderboard', {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: isMobile ? '36px' : '48px',
+            fontWeight: 'bold',
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4
         }).setOrigin(0.5);
 
-        // Get and display high scores
+        // Create scrollable container for scores
+        const scrollableArea = this.add.container(width / 2, 120);
+        
+        // Get and display high scores with iOS-style design
         const highScores = JSON.parse(localStorage.getItem('highScores') || '[]');
-        const startY = 150;
-        const spacing = isMobile ? 35 : 40;
+        const spacing = isMobile ? 60 : 70;
 
         highScores.forEach((score, index) => {
             const dateStr = new Date(score.date).toLocaleDateString();
             const name = score.name || 'Anonymous';
             
-            // Create score container
-            const container = this.add.container(width / 2, startY + index * spacing);
+            // Score container with blur effect
+            const scoreContainer = this.add.container(0, index * spacing);
             
-            // Add background for each score
-            const bg = this.add.rectangle(0, 0, width * 0.8, spacing - 5, 0x000000, index % 2 === 0 ? 0.3 : 0.4);
-            container.add(bg);
+            // Score background
+            const scoreBg = this.add.rectangle(0, 0, width * 0.8, spacing - 10, 0xFFFFFF, 0.1);
+            scoreBg.postFX.addBlur(1, 1, 1, 0.1);
             
-            // Add score text
-            const scoreText = this.add.text(0, 0, 
-                `${index + 1}. ${name} - ${score.score} - ${dateStr}`, {
-                fontSize: scoreFontSize,
-                fill: '#fff',
-                stroke: '#000',
-                strokeThickness: 2
+            // Score content with modern typography
+            const rankText = this.add.text(-width * 0.35, 0, `#${index + 1}`, {
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: isMobile ? '24px' : '28px',
+                fontWeight: 'bold',
+                fill: '#ffffff'
+            }).setOrigin(0, 0.5);
+            
+            const nameText = this.add.text(-width * 0.25, 0, name, {
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: isMobile ? '20px' : '24px',
+                fill: '#ffffff'
+            }).setOrigin(0, 0.5);
+            
+            const scoreValue = this.add.text(width * 0.15, 0, score.score.toString(), {
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: isMobile ? '20px' : '24px',
+                fontWeight: '600',
+                fill: '#ffffff'
             }).setOrigin(0.5);
-            container.add(scoreText);
+            
+            const dateText = this.add.text(width * 0.3, 0, dateStr, {
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: isMobile ? '16px' : '20px',
+                fill: '#ffffff',
+                alpha: 0.8
+            }).setOrigin(0, 0.5);
+            
+            scoreContainer.add([scoreBg, rankText, nameText, scoreValue, dateText]);
+            scrollableArea.add(scoreContainer);
         });
 
-        // Button style
-        const buttonStyle = {
-            fontSize: isMobile ? '24px' : '32px',
-            fill: '#fff',
-            backgroundColor: '#e74c3c',
-            padding: { x: isMobile ? 15 : 20, y: isMobile ? 8 : 10 },
-            shadow: { blur: 4, color: '#000000', fill: true },
-            stroke: '#000',
-            strokeThickness: 2
-        };
+        // iOS-style buttons
+        const buttonY = height - (isMobile ? 80 : 100);
+        const buttonWidth = isMobile ? 140 : 160;
+        
+        // Back button with blur effect
+        const backButton = this.add.container(width / 2 - buttonWidth, buttonY);
+        const backBg = this.add.rectangle(0, 0, buttonWidth - 20, isMobile ? 44 : 50, 0xFF3B30, 0.9)
+            .setInteractive();
+        backBg.postFX.addBlur(1, 1, 1, 0.1);
+        
+        const backText = this.add.text(0, 0, 'Back', {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: isMobile ? '20px' : '24px',
+            fontWeight: '600',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+        
+        backButton.add([backBg, backText]);
 
-        // Back button
-        const backButton = this.add.text(width / 2 - (isMobile ? 80 : 100), height - (isMobile ? 80 : 100), 
-            'Back', buttonStyle)
-            .setInteractive()
-            .setOrigin(0.5)
-            .on('pointerover', () => backButton.setScale(1.1))
-            .on('pointerout', () => backButton.setScale(1));
+        // Clear button
+        const clearButton = this.add.container(width / 2 + buttonWidth, buttonY);
+        const clearBg = this.add.rectangle(0, 0, buttonWidth - 20, isMobile ? 44 : 50, 0x8E8E93, 0.9)
+            .setInteractive();
+        clearBg.postFX.addBlur(1, 1, 1, 0.1);
+        
+        const clearText = this.add.text(0, 0, 'Clear All', {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: isMobile ? '20px' : '24px',
+            fontWeight: '600',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+        
+        clearButton.add([clearBg, clearText]);
 
-        // Erase button
-        const eraseButton = this.add.text(width / 2 + (isMobile ? 80 : 100), height - (isMobile ? 80 : 100), 
-            'Erase All', {
-                ...buttonStyle,
-                backgroundColor: '#95a5a6'
-            })
-            .setInteractive()
-            .setOrigin(0.5)
-            .on('pointerover', () => eraseButton.setScale(1.1))
-            .on('pointerout', () => eraseButton.setScale(1));
+        // Add iOS-style touch feedback
+        [backBg, clearBg].forEach(button => {
+            button.on('pointerdown', () => {
+                this.tweens.add({
+                    targets: button.parentContainer,
+                    scale: 0.95,
+                    duration: 100
+                });
+            });
+            
+            button.on('pointerup', () => {
+                this.tweens.add({
+                    targets: button.parentContainer,
+                    scale: 1,
+                    duration: 100
+                });
+            });
+            
+            button.on('pointerout', () => {
+                this.tweens.add({
+                    targets: button.parentContainer,
+                    scale: 1,
+                    duration: 100
+                });
+            });
+        });
 
-        backButton.on('pointerdown', () => {
+        // Add button functionality
+        backBg.on('pointerup', () => {
             this.scene.start('GameScene');
         });
 
-        eraseButton.on('pointerdown', () => {
-            if (confirm('Are you sure you want to erase all scores?')) {
+        clearBg.on('pointerup', () => {
+            if (confirm('Are you sure you want to clear all scores?')) {
                 localStorage.removeItem('highScores');
                 this.scene.restart();
             }
