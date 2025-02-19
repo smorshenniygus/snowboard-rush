@@ -47,7 +47,8 @@ class GameScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(this.game.config.width / 2, this.game.config.height * 0.2, 'snowboarder');
         this.player.setScale(window.innerWidth < 768 ? 0.8 : 1.5);
         this.player.setAngle(0);
-        this.player.setSize(this.player.width * 0.7, this.player.height * 0.7);
+        this.player.setSize(this.player.width * 0.5, this.player.height * 0.5);
+        this.player.setOffset(this.player.width * 0.25, this.player.height * 0.25);
         this.player.setScrollFactor(0);
         this.player.setDamping(true);
         this.player.setDrag(0.95);
@@ -164,9 +165,13 @@ class GameScene extends Phaser.Scene {
         const currentTime = new Date().getTime();
         if (currentTime - this.lastMoveTime >= this.moveDelay) {
             const targetX = this.player.x + (direction * this.moveDistance);
-            // Adjust boundaries to use actual screen width with small margins
-            const margin = 30;
-            if (targetX >= margin && targetX <= this.game.config.width - margin) {
+            // Reduce margin and use player width for more precise boundaries
+            const margin = 15;
+            const playerHalfWidth = (this.player.width * this.player.scale * 0.5) / 2;
+            
+            // Use player's actual width in boundary calculation
+            if (targetX >= margin + playerHalfWidth && 
+                targetX <= this.game.config.width - margin - playerHalfWidth) {
                 // Enhanced smooth movement using improved lerp
                 this.player.x = Phaser.Math.Linear(
                     this.player.x,
@@ -203,9 +208,7 @@ class GameScene extends Phaser.Scene {
 
     spawnObstacles() {
         const isMobile = window.innerWidth < 768;
-        // Calculate spawn zones with balanced intervals and increased frequency
         const spawnZones = [];
-        // Adjust spawn range and interval based on device and game progress
         const baseInterval = this.score < 100 ? (isMobile ? 68 : 60) :
                            this.score < 300 ? (isMobile ? 51 : 43) :
                            (isMobile ? 38 : 34);
@@ -214,11 +217,9 @@ class GameScene extends Phaser.Scene {
             spawnZones.push(this.game.config.height + y);
         }
 
-        // Track positions to ensure better spacing
         const existingPositions = new Set();
         let obstaclesSpawned = 0;
 
-        // Increased base spawn chances by ~15-20%
         const baseStaticChance = Math.min(46 + (this.score / 20), 85);
         const baseMovingChance = Math.min(35 + (this.score / 30), 70);
 
@@ -226,14 +227,16 @@ class GameScene extends Phaser.Scene {
         spawnZones.forEach(zoneY => {
             if (Phaser.Math.Between(0, 100) < (isMobile ? baseStaticChance : baseStaticChance + 5)) {
                 for (let attempt = 0; attempt < (isMobile ? 2 : 3); attempt++) {
-                    // Adjust obstacle spawn boundaries to match player boundaries
-                    const margin = 30;
+                    // Match obstacle spawn boundaries with player movement area
+                    const margin = 15;
                     let x = Phaser.Math.Between(margin, this.game.config.width - margin);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
                         obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);
-                        obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
+                        // Adjust obstacle hitbox
+                        obstacle.setSize(obstacle.width * 0.5, obstacle.height * 0.5);
+                        obstacle.setOffset(obstacle.width * 0.25, obstacle.height * 0.25);
                         obstaclesSpawned++;
                         break;
                     }
@@ -241,12 +244,11 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Spawn moving obstacles (skiers) with progressive difficulty
+        // Spawn moving obstacles (skiers)
         spawnZones.forEach((zoneY, index) => {
             if (index % 2 === 0 && Phaser.Math.Between(0, 100) < (isMobile ? baseMovingChance : baseMovingChance + 5)) {
                 for (let attempt = 0; attempt < 2; attempt++) {
-                    // Adjust skier spawn boundaries to match player boundaries
-                    const margin = 30;
+                    const margin = 15;
                     let x = Phaser.Math.Between(margin, this.game.config.width - margin);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
@@ -254,7 +256,9 @@ class GameScene extends Phaser.Scene {
                         obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);
                         obstacle.speed = Math.min(4 + (this.score / 100), 10);
                         obstacle.setAngle(0);
-                        obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
+                        // Adjust skier hitbox
+                        obstacle.setSize(obstacle.width * 0.5, obstacle.height * 0.5);
+                        obstacle.setOffset(obstacle.width * 0.25, obstacle.height * 0.25);
                         obstacle.horizontalSpeed = Phaser.Math.Between(-2, 2);
                         obstacle.nextDirectionChange = 0;
                         obstaclesSpawned++;
