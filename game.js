@@ -411,88 +411,118 @@ class GameOverScene extends Phaser.Scene {
     create() {
         const { width, height } = this.game.config;
         const isMobile = window.innerWidth < 768;
-        const fontSize = isMobile ? '48px' : '64px';
-        const buttonFontSize = isMobile ? '24px' : '32px';
-        const buttonSpacing = isMobile ? height * 0.08 : height * 0.1;
 
-        // Semi-transparent background
-        this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0);
+        // Modern semi-transparent overlay
+        this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
+            .setOrigin(0)
+            .setAlpha(0);
+        this.tweens.add({
+            targets: this.children.list[0],
+            alpha: 0.7,
+            duration: 500,
+            ease: 'Power2'
+        });
 
-        // Game Over text with glow effect
-        const gameOverText = this.add.text(width / 2, height / 3, 'Game Over', {
-            fontSize: fontSize,
-            fill: '#fff',
-            stroke: '#000',
+        // Game Over text with animation
+        const gameOverText = this.add.text(width / 2, height * 0.3, 'Game Over', {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: isMobile ? '48px' : '64px',
+            fontWeight: 'bold',
+            fill: '#ffffff',
+            stroke: '#000000',
             strokeThickness: 6,
-            shadow: { blur: 8, color: '#ff4444', fill: true }
-        }).setOrigin(0.5);
+            shadow: {
+                offsetX: 3,
+                offsetY: 3,
+                color: '#000000',
+                blur: 8,
+                fill: true
+            }
+        }).setOrigin(0.5).setAlpha(0);
 
-        // Score text with animation
-        const scoreText = this.add.text(width / 2, height / 2, `Score: ${this.score}`, {
-            fontSize: buttonFontSize,
-            fill: '#fff',
-            stroke: '#000',
+        // Animate game over text
+        this.tweens.add({
+            targets: gameOverText,
+            y: height * 0.25,
+            alpha: 1,
+            duration: 800,
+            ease: 'Back.out'
+        });
+
+        // Score display with animation
+        const scoreText = this.add.text(width / 2, height * 0.4, `Score: ${this.score}`, {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: isMobile ? '32px' : '48px',
+            fontWeight: '600',
+            fill: '#ffffff',
+            stroke: '#000000',
             strokeThickness: 4
-        }).setOrigin(0.5);
-        
-        // Animate score text
+        }).setOrigin(0.5).setAlpha(0);
+
         this.tweens.add({
             targets: scoreText,
+            alpha: 1,
             scale: 1.2,
-            duration: 200,
-            yoyo: true,
-            repeat: 1
+            duration: 600,
+            delay: 400,
+            ease: 'Back.out'
         });
 
-        const buttonStyle = {
-            fontSize: buttonFontSize,
-            fill: '#fff',
-            stroke: '#000',
-            strokeThickness: 2,
-            backgroundColor: '#2ecc71',
-            padding: { x: isMobile ? 15 : 20, y: isMobile ? 8 : 10 },
-            shadow: { blur: 4, color: '#000000', fill: true }
+        // Create modern buttons
+        const createButton = (text, y, color, delay) => {
+            const button = this.add.container(width / 2, y);
+            
+            // Button background
+            const bg = this.add.rectangle(0, 0, isMobile ? 200 : 250, isMobile ? 50 : 60, color)
+                .setOrigin(0.5)
+                .setAlpha(0.9);
+            
+            // Button text
+            const txt = this.add.text(0, 0, text, {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: isMobile ? '20px' : '24px',
+                fontWeight: 'bold',
+                fill: '#ffffff'
+            }).setOrigin(0.5);
+
+            button.add([bg, txt]);
+            button.setAlpha(0);
+            
+            // Add hover effects
+            bg.setInteractive()
+                .on('pointerover', () => this.tweens.add({
+                    targets: button,
+                    scale: 1.05,
+                    duration: 200
+                }))
+                .on('pointerout', () => this.tweens.add({
+                    targets: button,
+                    scale: 1,
+                    duration: 200
+                }));
+
+            // Animate button appearance
+            this.tweens.add({
+                targets: button,
+                alpha: 1,
+                y: y - 10,
+                duration: 500,
+                delay: delay,
+                ease: 'Back.out'
+            });
+
+            return button;
         };
 
-        // Play Again button
-        const playAgainButton = this.add.text(width / 2, height / 2 + buttonSpacing, 'Play Again', buttonStyle)
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerover', () => playAgainButton.setScale(1.1))
-            .on('pointerout', () => playAgainButton.setScale(1));
-
-        // Save Score button
-        const saveScoreButton = this.add.text(width / 2, height / 2 + buttonSpacing * 2, 'Save Score', {
-            ...buttonStyle,
-            backgroundColor: '#3498db'
-        })
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerover', () => saveScoreButton.setScale(1.1))
-            .on('pointerout', () => saveScoreButton.setScale(1));
-
-        // Leaderboard button
-        const leaderboardButton = this.add.text(width / 2, height / 2 + buttonSpacing * 3, 'Leaderboard', {
-            ...buttonStyle,
-            backgroundColor: '#9b59b6'
-        })
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerover', () => leaderboardButton.setScale(1.1))
-            .on('pointerout', () => leaderboardButton.setScale(1));
+        // Add buttons with different colors and animations
+        const playAgainButton = createButton('Play Again', height * 0.6, 0x2ecc71, 600);
+        const saveScoreButton = createButton('Save Score', height * 0.7, 0x3498db, 800);
+        const leaderboardButton = createButton('Leaderboard', height * 0.8, 0x9b59b6, 1000);
 
         // Add button functionality
-        playAgainButton.on('pointerdown', () => {
-            this.scene.start('GameScene');
-        });
-
-        saveScoreButton.on('pointerdown', () => {
-            this.scene.start('NameInputScene', { score: this.score });
-        });
-
-        leaderboardButton.on('pointerdown', () => {
-            this.scene.start('LeaderboardScene');
-        });
+        playAgainButton.list[0].on('pointerdown', () => this.scene.start('GameScene'));
+        saveScoreButton.list[0].on('pointerdown', () => this.scene.start('NameInputScene', { score: this.score }));
+        leaderboardButton.list[0].on('pointerdown', () => this.scene.start('LeaderboardScene'));
     }
 }
 
