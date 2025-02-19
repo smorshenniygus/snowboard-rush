@@ -17,7 +17,6 @@ class GameScene extends Phaser.Scene {
         this.movementSmoothing = 0.35;
         this.tiltAngle = 20;
         this.tiltSpeed = 0.3;
-        this.cameraShake = 0.5;
         this.lastCameraUpdate = 0;
     }
 
@@ -34,22 +33,32 @@ class GameScene extends Phaser.Scene {
         // Reset game state when starting a new game
         this.resetGameState();
         
+        // Lock camera to prevent movement
+        this.cameras.main.setScroll(0, 0);
+        this.cameras.main.scrollX = 0;
+        this.cameras.main.scrollY = 0;
+        
         // Set up scrolling background with smoother movement
         this.background = this.add.tileSprite(0, 0, this.game.config.width, this.game.config.height, 'background');
         this.background.setOrigin(0, 0);
-        this.background.setScrollFactor(0.8);
+        this.background.setScrollFactor(0);
 
         // Create player with enhanced smoothing
         this.player = this.physics.add.sprite(this.game.config.width / 2, this.game.config.height * 0.2, 'snowboarder');
         this.player.setScale(window.innerWidth < 768 ? 0.8 : 1.5);
         this.player.setAngle(0);
         this.player.setSize(this.player.width * 0.7, this.player.height * 0.7);
+        this.player.setScrollFactor(0);
         this.player.setDamping(true);
         this.player.setDrag(0.95);
 
-        // Initialize obstacle groups with physics
-        this.staticObstacles = this.physics.add.group();
-        this.movingObstacles = this.physics.add.group();
+        // Initialize obstacle groups with physics and set scroll factor
+        this.staticObstacles = this.physics.add.group({
+            scrollFactor: 0
+        });
+        this.movingObstacles = this.physics.add.group({
+            scrollFactor: 0
+        });
 
         // Add collision detection
         this.physics.add.overlap(this.player, this.staticObstacles, this.gameOver, null, this);
@@ -171,11 +180,6 @@ class GameScene extends Phaser.Scene {
                     this.tiltSpeed
                 );
 
-                // Add subtle camera shake based on movement
-                if (Math.abs(this.player.x - targetX) > 10) {
-                    this.cameras.main.shake(50, this.cameraShake * Math.abs(direction));
-                }
-
                 this.lastMoveTime = currentTime;
             }
         }
@@ -272,15 +276,6 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        // Smooth camera follow
-        if (this.player.x !== this.cameras.main.scrollX) {
-            this.cameras.main.scrollX = Phaser.Math.Linear(
-                this.cameras.main.scrollX,
-                this.player.x - this.game.config.width / 2,
-                0.1
-            );
-        }
-
         // Continuous smooth movement based on input with improved interpolation
         if (this.cursors.left.isDown || (this.isMoving && this.moveDirection === -1)) {
             this.movePlayer(-1);
@@ -295,10 +290,10 @@ class GameScene extends Phaser.Scene {
             );
         }
 
-        // Scroll background with progressive speed and parallax
+        // Scroll background with progressive speed
         const baseSpeed = 5;
         this.speed = Math.min(baseSpeed + (this.score / 100), 12);
-        this.background.tilePositionY += this.speed * 0.8;
+        this.background.tilePositionY += this.speed;
 
         // Progressive scoring
         if (time - this.lastSpeedIncrease > 1000) {
@@ -757,6 +752,13 @@ const config = {
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    // Add camera settings
+    cameras: {
+        main: {
+            backgroundColor: '#87CEEB',
+            roundPixels: true
+        }
     }
 };
 
