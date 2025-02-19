@@ -9,12 +9,14 @@ class GameScene extends Phaser.Scene {
         this.speed = 7;
         this.speedIncrease = 0.3;
         this.lastSpeedIncrease = 0;
-        this.moveDistance = 35;
+        this.moveDistance = 40;
         this.lastMoveTime = 0;
-        this.moveDelay = 100;
+        this.moveDelay = 80;
         this.isMoving = false;
         this.moveDirection = 0;
-        this.movementSmoothing = 0.15;
+        this.movementSmoothing = 0.25;
+        this.tiltAngle = 15;
+        this.tiltSpeed = 0.2;
     }
 
     preload() {
@@ -155,6 +157,15 @@ class GameScene extends Phaser.Scene {
                     targetX,
                     this.movementSmoothing
                 );
+
+                // Add tilt animation
+                const targetAngle = -direction * this.tiltAngle; // Negative for realistic tilt
+                this.player.angle = Phaser.Math.Linear(
+                    this.player.angle,
+                    targetAngle,
+                    this.tiltSpeed
+                );
+
                 this.lastMoveTime = currentTime;
             }
         }
@@ -256,6 +267,13 @@ class GameScene extends Phaser.Scene {
             this.movePlayer(-1);
         } else if (this.cursors.right.isDown || (this.isMoving && this.moveDirection === 1)) {
             this.movePlayer(1);
+        } else {
+            // Return to upright position when not moving
+            this.player.angle = Phaser.Math.Linear(
+                this.player.angle,
+                0,
+                this.tiltSpeed
+            );
         }
 
         // Scroll background with progressive speed
