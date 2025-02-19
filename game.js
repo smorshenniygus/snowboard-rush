@@ -164,7 +164,9 @@ class GameScene extends Phaser.Scene {
         const currentTime = new Date().getTime();
         if (currentTime - this.lastMoveTime >= this.moveDelay) {
             const targetX = this.player.x + (direction * this.moveDistance);
-            if (targetX > 50 && targetX < this.game.config.width - 50) {
+            // Adjust boundaries to use actual screen width with small margins
+            const margin = 30;
+            if (targetX >= margin && targetX <= this.game.config.width - margin) {
                 // Enhanced smooth movement using improved lerp
                 this.player.x = Phaser.Math.Linear(
                     this.player.x,
@@ -224,7 +226,9 @@ class GameScene extends Phaser.Scene {
         spawnZones.forEach(zoneY => {
             if (Phaser.Math.Between(0, 100) < (isMobile ? baseStaticChance : baseStaticChance + 5)) {
                 for (let attempt = 0; attempt < (isMobile ? 2 : 3); attempt++) {
-                    let x = Phaser.Math.Between(50, this.game.config.width - 50);
+                    // Adjust obstacle spawn boundaries to match player boundaries
+                    const margin = 30;
+                    let x = Phaser.Math.Between(margin, this.game.config.width - margin);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
@@ -241,7 +245,9 @@ class GameScene extends Phaser.Scene {
         spawnZones.forEach((zoneY, index) => {
             if (index % 2 === 0 && Phaser.Math.Between(0, 100) < (isMobile ? baseMovingChance : baseMovingChance + 5)) {
                 for (let attempt = 0; attempt < 2; attempt++) {
-                    let x = Phaser.Math.Between(50, this.game.config.width - 50);
+                    // Adjust skier spawn boundaries to match player boundaries
+                    const margin = 30;
+                    let x = Phaser.Math.Between(margin, this.game.config.width - margin);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
