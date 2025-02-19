@@ -31,9 +31,9 @@ class GameScene extends Phaser.Scene {
         this.background = this.add.tileSprite(0, 0, this.game.config.width, this.game.config.height, 'background');
         this.background.setOrigin(0, 0);
 
-        // Create player at the top with physics
+        // Create player with smaller scale for mobile
         this.player = this.physics.add.sprite(this.game.config.width / 2, this.game.config.height * 0.2, 'snowboarder');
-        this.player.setScale(1.5);
+        this.player.setScale(window.innerWidth < 768 ? 0.8 : 1.5);
         this.player.setAngle(0);
         // Set player collision body size
         this.player.setSize(this.player.width * 0.7, this.player.height * 0.7);
@@ -46,36 +46,59 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.staticObstacles, this.gameOver, null, this);
         this.physics.add.overlap(this.player, this.movingObstacles, this.gameOver, null, this);
 
-        // Set up score display
+        // Set up score display with responsive font size
+        const fontSize = window.innerWidth < 768 ? '24px' : '32px';
         this.scoreText = this.add.text(16, 16, 'Score: 0', {
-            fontSize: '32px',
+            fontSize: fontSize,
             fill: '#fff',
             stroke: '#000',
-            strokeThickness: 4
+            strokeThickness: 4,
+            shadowColor: '#000',
+            shadowBlur: 4,
+            shadowOffsetX: 2,
+            shadowOffsetY: 2
         });
 
-        // Add control buttons for mobile
+        // Add control buttons for mobile with improved styling
+        const buttonSize = window.innerWidth < 768 ? 50 : 60;
+        const buttonY = this.game.config.height - (window.innerWidth < 768 ? 70 : 80);
         const buttonStyle = {
-            fontSize: '48px',
+            fontSize: window.innerWidth < 768 ? '36px' : '48px',
             fill: '#fff',
             backgroundColor: '#000000aa',
-            padding: { x: 20, y: 10 },
-            fixedWidth: 60,
-            fixedHeight: 60,
-            align: 'center'
+            padding: { x: 15, y: 8 },
+            fixedWidth: buttonSize,
+            fixedHeight: buttonSize,
+            align: 'center',
+            shadow: { blur: 4, color: '#000000', fill: true },
+            stroke: '#ffffff',
+            strokeThickness: 2
         };
 
-        this.leftButton = this.add.text(50, this.game.config.height - 80, '←', buttonStyle)
+        this.leftButton = this.add.text(40, buttonY, '←', buttonStyle)
             .setInteractive()
-            .setScrollFactor(0);
+            .setScrollFactor(0)
+            .setAlpha(0.8);
         
-        this.rightButton = this.add.text(this.game.config.width - 110, this.game.config.height - 80, '→', buttonStyle)
+        this.rightButton = this.add.text(this.game.config.width - 90, buttonY, '→', buttonStyle)
             .setInteractive()
-            .setScrollFactor(0);
+            .setScrollFactor(0)
+            .setAlpha(0.8);
 
-        // Add button controls
-        this.leftButton.on('pointerdown', () => this.movePlayer(-1));
-        this.rightButton.on('pointerdown', () => this.movePlayer(1));
+        // Add button controls with hover effects
+        this.leftButton.on('pointerdown', () => {
+            this.leftButton.setAlpha(1);
+            this.movePlayer(-1);
+        });
+        this.leftButton.on('pointerup', () => this.leftButton.setAlpha(0.8));
+        this.leftButton.on('pointerout', () => this.leftButton.setAlpha(0.8));
+
+        this.rightButton.on('pointerdown', () => {
+            this.rightButton.setAlpha(1);
+            this.movePlayer(1);
+        });
+        this.rightButton.on('pointerup', () => this.rightButton.setAlpha(0.8));
+        this.rightButton.on('pointerout', () => this.rightButton.setAlpha(0.8));
 
         // Set up keyboard controls
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -117,7 +140,7 @@ class GameScene extends Phaser.Scene {
     spawnObstacles() {
         // Calculate spawn zones with smaller intervals for better vertical distribution
         const spawnZones = [];
-        for (let y = 50; y <= 600; y += 100) { // Adjusted vertical spacing
+        for (let y = 50; y <= 600; y += 100) {
             spawnZones.push(this.game.config.height + y);
         }
 
@@ -127,57 +150,28 @@ class GameScene extends Phaser.Scene {
 
         // Spawn static obstacles with better distribution
         spawnZones.forEach(zoneY => {
-            // Ensure at least one obstacle per zone
-            let attempts = 0;
-            let x;
-            let hasSpawnedInZone = false;
-
-            // Try up to 3 times to place an obstacle in this zone
-            while (!hasSpawnedInZone && attempts < 3) {
-                x = Phaser.Math.Between(50, this.game.config.width - 50);
+            if (Phaser.Math.Between(0, 100) < 70) {
+                let x = Phaser.Math.Between(50, this.game.config.width - 50);
                 if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                     existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                     const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
-                    obstacle.setScale(1.2);
+                    // Scale obstacles based on screen size
+                    obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
                     obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
-                    hasSpawnedInZone = true;
                     obstaclesSpawned++;
-                }
-                attempts++;
-            }
-
-            // Try to add an additional obstacle with 50% chance
-            if (Phaser.Math.Between(0, 100) < 50) {
-                attempts = 0;
-                while (attempts < 3) {
-                    x = Phaser.Math.Between(50, this.game.config.width - 50);
-                    if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
-                        existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
-                        const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
-                        obstacle.setScale(1.2);
-                        obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
-                        obstaclesSpawned++;
-                        break;
-                    }
-                    attempts++;
                 }
             }
         });
 
-        // Spawn moving obstacles (skiers) with better distribution
+        // Spawn moving obstacles (skiers)
         spawnZones.forEach((zoneY, index) => {
-            if (index % 2 === 0 && Phaser.Math.Between(0, 100) < 40) { // Spawn skiers more frequently
-                let attempts = 0;
-                let x;
-                do {
-                    x = Phaser.Math.Between(50, this.game.config.width - 50);
-                    attempts++;
-                } while (this.isPositionOccupied(x, zoneY, existingPositions) && attempts < 5);
-
-                if (attempts < 5) {
+            if (index % 2 === 0 && Phaser.Math.Between(0, 100) < 40) {
+                let x = Phaser.Math.Between(50, this.game.config.width - 50);
+                if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                     existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                     const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
-                    obstacle.setScale(1.2);
+                    // Scale skiers based on screen size
+                    obstacle.setScale(window.innerWidth < 768 ? 0.8 : 1.2);
                     obstacle.speed = Phaser.Math.Between(6, 12);
                     obstacle.setAngle(0);
                     obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
@@ -187,19 +181,6 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
-
-        // If not enough obstacles were spawned, force spawn some more
-        if (obstaclesSpawned < 3) {
-            const extraSpawnY = this.game.config.height + Phaser.Math.Between(50, 600);
-            for (let i = 0; i < 3 - obstaclesSpawned; i++) {
-                let x = Phaser.Math.Between(50, this.game.config.width - 50);
-                if (!this.isPositionOccupied(x, extraSpawnY, existingPositions)) {
-                    const obstacle = this.staticObstacles.create(x, extraSpawnY, Phaser.Math.RND.pick(['rock', 'tree']));
-                    obstacle.setScale(1.2);
-                    obstacle.setSize(obstacle.width * 0.7, obstacle.height * 0.7);
-                }
-            }
-        }
     }
 
     isPositionOccupied(x, y, existingPositions) {
@@ -316,52 +297,84 @@ class NameInputScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.game.config;
+        const isMobile = window.innerWidth < 768;
+        const fontSize = isMobile ? '36px' : '48px';
+        const scoreFontSize = isMobile ? '24px' : '32px';
 
-        // Add title
+        // Semi-transparent background
+        this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0);
+
+        // Add title with glow effect
         this.add.text(width / 2, height * 0.2, 'New High Score!', {
-            fontSize: '48px',
+            fontSize: fontSize,
             fill: '#fff',
             stroke: '#000',
-            strokeThickness: 6
+            strokeThickness: 6,
+            shadow: { blur: 8, color: '#f1c40f', fill: true }
         }).setOrigin(0.5);
 
-        // Add score display
-        this.add.text(width / 2, height * 0.3, `Score: ${this.score}`, {
-            fontSize: '32px',
+        // Add score display with animation
+        const scoreText = this.add.text(width / 2, height * 0.3, `Score: ${this.score}`, {
+            fontSize: scoreFontSize,
             fill: '#fff',
             stroke: '#000',
-            strokeThickness: 4
+            strokeThickness: 4,
+            shadow: { blur: 4, color: '#000000', fill: true }
         }).setOrigin(0.5);
 
-        // Create input field background
-        const inputBg = this.add.rectangle(width / 2, height * 0.4, 300, 60, 0x000000, 0.5);
+        // Animate score
+        this.tweens.add({
+            targets: scoreText,
+            scale: 1.2,
+            duration: 200,
+            yoyo: true,
+            repeat: 1
+        });
+
+        // Create input field background with glow
+        const inputBg = this.add.rectangle(width / 2, height * 0.4, isMobile ? 250 : 300, isMobile ? 50 : 60, 0x000000, 0.5);
         inputBg.setInteractive();
+        
+        // Add glow effect to input field
+        inputBg.postFX.addGlow(0x3498db, 4, 0, false, 0.1, 16);
 
         // Add placeholder text
         this.nameText = this.add.text(width / 2, height * 0.4, 'Click to enter name', {
-            fontSize: '24px',
-            fill: '#999'
+            fontSize: isMobile ? '20px' : '24px',
+            fill: '#999',
+            stroke: '#000',
+            strokeThickness: 2
         }).setOrigin(0.5);
 
-        // Handle input
+        // Handle input with improved visual feedback
         let playerName = '';
         inputBg.on('pointerdown', () => {
-            // Use browser's prompt for simplicity
+            inputBg.setFillStyle(0x3498db, 0.3);
             const name = prompt('Enter your name:', '');
             if (name) {
-                playerName = name.substring(0, 15); // Limit name length
+                playerName = name.substring(0, 15);
                 this.nameText.setText(playerName);
                 this.nameText.setStyle({ fill: '#fff' });
             }
+            inputBg.setFillStyle(0x000000, 0.5);
         });
 
-        // Add submit button
-        const submitButton = this.add.text(width / 2, height * 0.6, 'Submit', {
-            fontSize: '32px',
+        // Add submit button with improved styling
+        const buttonStyle = {
+            fontSize: isMobile ? '24px' : '32px',
             fill: '#fff',
             backgroundColor: '#2ecc71',
-            padding: { x: 20, y: 10 }
-        }).setInteractive().setOrigin(0.5);
+            padding: { x: isMobile ? 15 : 20, y: isMobile ? 8 : 10 },
+            shadow: { blur: 4, color: '#000000', fill: true },
+            stroke: '#000',
+            strokeThickness: 2
+        };
+
+        const submitButton = this.add.text(width / 2, height * 0.6, 'Submit', buttonStyle)
+            .setInteractive()
+            .setOrigin(0.5)
+            .on('pointerover', () => submitButton.setScale(1.1))
+            .on('pointerout', () => submitButton.setScale(1));
 
         submitButton.on('pointerdown', () => {
             if (playerName.trim() === '') {
@@ -377,8 +390,11 @@ class NameInputScene extends Phaser.Scene {
             highScores.sort((a, b) => b.score - a.score);
             localStorage.setItem('highScores', JSON.stringify(highScores.slice(0, 10)));
             
-            // Go to leaderboard
-            this.scene.start('LeaderboardScene');
+            // Transition effect
+            this.cameras.main.fade(500, 0, 0, 0);
+            this.cameras.main.once('camerafadeoutcomplete', () => {
+                this.scene.start('LeaderboardScene');
+            });
         });
     }
 }
@@ -394,54 +410,85 @@ class GameOverScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.game.config;
+        const isMobile = window.innerWidth < 768;
+        const fontSize = isMobile ? '48px' : '64px';
+        const buttonFontSize = isMobile ? '24px' : '32px';
+        const buttonSpacing = isMobile ? height * 0.08 : height * 0.1;
 
-        // Game Over text
-        this.add.text(width / 2, height / 3, 'Game Over', {
-            fontSize: '64px',
+        // Semi-transparent background
+        this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0);
+
+        // Game Over text with glow effect
+        const gameOverText = this.add.text(width / 2, height / 3, 'Game Over', {
+            fontSize: fontSize,
             fill: '#fff',
             stroke: '#000',
-            strokeThickness: 6
+            strokeThickness: 6,
+            shadow: { blur: 8, color: '#ff4444', fill: true }
         }).setOrigin(0.5);
 
-        // Score text
-        this.add.text(width / 2, height / 2, `Score: ${this.score}`, {
-            fontSize: '32px',
+        // Score text with animation
+        const scoreText = this.add.text(width / 2, height / 2, `Score: ${this.score}`, {
+            fontSize: buttonFontSize,
             fill: '#fff',
             stroke: '#000',
             strokeThickness: 4
         }).setOrigin(0.5);
+        
+        // Animate score text
+        this.tweens.add({
+            targets: scoreText,
+            scale: 1.2,
+            duration: 200,
+            yoyo: true,
+            repeat: 1
+        });
+
+        const buttonStyle = {
+            fontSize: buttonFontSize,
+            fill: '#fff',
+            stroke: '#000',
+            strokeThickness: 2,
+            backgroundColor: '#2ecc71',
+            padding: { x: isMobile ? 15 : 20, y: isMobile ? 8 : 10 },
+            shadow: { blur: 4, color: '#000000', fill: true }
+        };
 
         // Play Again button
-        const playAgainButton = this.add.text(width / 2, height * 0.6, 'Play Again', {
-            fontSize: '32px',
-            fill: '#fff',
-            backgroundColor: '#2ecc71',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive();
+        const playAgainButton = this.add.text(width / 2, height / 2 + buttonSpacing, 'Play Again', buttonStyle)
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerover', () => playAgainButton.setScale(1.1))
+            .on('pointerout', () => playAgainButton.setScale(1));
 
+        // Save Score button
+        const saveScoreButton = this.add.text(width / 2, height / 2 + buttonSpacing * 2, 'Save Score', {
+            ...buttonStyle,
+            backgroundColor: '#3498db'
+        })
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerover', () => saveScoreButton.setScale(1.1))
+            .on('pointerout', () => saveScoreButton.setScale(1));
+
+        // Leaderboard button
+        const leaderboardButton = this.add.text(width / 2, height / 2 + buttonSpacing * 3, 'Leaderboard', {
+            ...buttonStyle,
+            backgroundColor: '#9b59b6'
+        })
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerover', () => leaderboardButton.setScale(1.1))
+            .on('pointerout', () => leaderboardButton.setScale(1));
+
+        // Add button functionality
         playAgainButton.on('pointerdown', () => {
             this.scene.start('GameScene');
         });
 
-        // Save Score button
-        const saveScoreButton = this.add.text(width / 2, height * 0.7, 'Save Score', {
-            fontSize: '32px',
-            fill: '#fff',
-            backgroundColor: '#3498db',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive();
-
         saveScoreButton.on('pointerdown', () => {
             this.scene.start('NameInputScene', { score: this.score });
         });
-
-        // View Leaderboard button
-        const leaderboardButton = this.add.text(width / 2, height * 0.8, 'Leaderboard', {
-            fontSize: '32px',
-            fill: '#fff',
-            backgroundColor: '#9b59b6',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive();
 
         leaderboardButton.on('pointerdown', () => {
             this.scene.start('LeaderboardScene');
@@ -456,44 +503,78 @@ class LeaderboardScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.game.config;
+        const isMobile = window.innerWidth < 768;
+        const fontSize = isMobile ? '36px' : '48px';
+        const scoreFontSize = isMobile ? '20px' : '24px';
 
-        // Title
+        // Semi-transparent background
+        this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0);
+
+        // Title with glow effect
         this.add.text(width / 2, 50, 'Leaderboard', {
-            fontSize: '48px',
+            fontSize: fontSize,
             fill: '#fff',
             stroke: '#000',
-            strokeThickness: 6
+            strokeThickness: 6,
+            shadow: { blur: 8, color: '#9b59b6', fill: true }
         }).setOrigin(0.5);
 
         // Get and display high scores
         const highScores = JSON.parse(localStorage.getItem('highScores') || '[]');
+        const startY = 150;
+        const spacing = isMobile ? 35 : 40;
+
         highScores.forEach((score, index) => {
             const dateStr = new Date(score.date).toLocaleDateString();
             const name = score.name || 'Anonymous';
-            this.add.text(width / 2, 150 + index * 40, 
+            
+            // Create score container
+            const container = this.add.container(width / 2, startY + index * spacing);
+            
+            // Add background for each score
+            const bg = this.add.rectangle(0, 0, width * 0.8, spacing - 5, 0x000000, index % 2 === 0 ? 0.3 : 0.4);
+            container.add(bg);
+            
+            // Add score text
+            const scoreText = this.add.text(0, 0, 
                 `${index + 1}. ${name} - ${score.score} - ${dateStr}`, {
-                fontSize: '24px',
+                fontSize: scoreFontSize,
                 fill: '#fff',
                 stroke: '#000',
-                strokeThickness: 3
+                strokeThickness: 2
             }).setOrigin(0.5);
+            container.add(scoreText);
         });
 
-        // Back button
-        const backButton = this.add.text(width / 2 - 100, height - 100, 'Back to Game', {
-            fontSize: '32px',
+        // Button style
+        const buttonStyle = {
+            fontSize: isMobile ? '24px' : '32px',
             fill: '#fff',
             backgroundColor: '#e74c3c',
-            padding: { x: 20, y: 10 }
-        }).setInteractive().setOrigin(0.5);
+            padding: { x: isMobile ? 15 : 20, y: isMobile ? 8 : 10 },
+            shadow: { blur: 4, color: '#000000', fill: true },
+            stroke: '#000',
+            strokeThickness: 2
+        };
+
+        // Back button
+        const backButton = this.add.text(width / 2 - (isMobile ? 80 : 100), height - (isMobile ? 80 : 100), 
+            'Back', buttonStyle)
+            .setInteractive()
+            .setOrigin(0.5)
+            .on('pointerover', () => backButton.setScale(1.1))
+            .on('pointerout', () => backButton.setScale(1));
 
         // Erase button
-        const eraseButton = this.add.text(width / 2 + 100, height - 100, 'Erase All', {
-            fontSize: '32px',
-            fill: '#fff',
-            backgroundColor: '#95a5a6',
-            padding: { x: 20, y: 10 }
-        }).setInteractive().setOrigin(0.5);
+        const eraseButton = this.add.text(width / 2 + (isMobile ? 80 : 100), height - (isMobile ? 80 : 100), 
+            'Erase All', {
+                ...buttonStyle,
+                backgroundColor: '#95a5a6'
+            })
+            .setInteractive()
+            .setOrigin(0.5)
+            .on('pointerover', () => eraseButton.setScale(1.1))
+            .on('pointerout', () => eraseButton.setScale(1));
 
         backButton.on('pointerdown', () => {
             this.scene.start('GameScene');
@@ -502,7 +583,7 @@ class LeaderboardScene extends Phaser.Scene {
         eraseButton.on('pointerdown', () => {
             if (confirm('Are you sure you want to erase all scores?')) {
                 localStorage.removeItem('highScores');
-                this.scene.restart(); // Refresh the leaderboard
+                this.scene.restart();
             }
         });
     }
