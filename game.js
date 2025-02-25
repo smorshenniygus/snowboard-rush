@@ -210,29 +210,79 @@ class GameScene extends Phaser.Scene {
         const isMobile = window.innerWidth < 768;
         const spawnZones = [];
         
-        // Make intervals decrease more aggressively with score
+        // Create more fine-grained spawn zones for better distribution
         const baseInterval = this.score < 100 ? (isMobile ? 68 : 60) :
-                           this.score < 300 ? (isMobile ? 45 : 38) :  // Decreased from 51/43
-                           this.score < 600 ? (isMobile ? 35 : 30) :  // New intermediate tier
-                           (isMobile ? 30 : 25);                      // More obstacles at high scores
+                           this.score < 300 ? (isMobile ? 45 : 38) :
+                           this.score < 600 ? (isMobile ? 35 : 30) :
+                           (isMobile ? 30 : 25);
         
         for (let y = 50; y <= (isMobile ? 800 : 1200); y += baseInterval) {
             spawnZones.push(this.game.config.height + y);
         }
 
+        // Create lanes for obstacle distribution
+        const numLanes = isMobile ? 5 : 7;
+        const laneWidth = (this.game.config.width - 30) / numLanes;
+        
+        // Track occupied positions and lanes
         const existingPositions = new Set();
+        const occupiedLanes = new Array(spawnZones.length).fill().map(() => new Set());
         let obstaclesSpawned = 0;
 
-        // Increase spawn chances more aggressively
-        const baseStaticChance = Math.min(50 + (this.score / 15), 90);  // Increased from 46 + score/20, max 85
-        const baseMovingChance = Math.min(40 + (this.score / 25), 80);  // Increased from 35 + score/30, max 70
+        // Spawn chance calculation
+        const baseStaticChance = Math.min(50 + (this.score / 15), 90);
+        const baseMovingChance = Math.min(40 + (this.score / 25), 80);
 
-        // Spawn static obstacles with progressive difficulty
-        spawnZones.forEach(zoneY => {
-            if (Phaser.Math.Between(0, 100) < (isMobile ? baseStaticChance : baseStaticChance + 5)) {
-                for (let attempt = 0; attempt < (isMobile ? 2 : 3); attempt++) {
+        // First pass: Distribute static obstacles more evenly across lanes
+        spawnZones.forEach((zoneY, zoneIndex) => {
+            // Always create some minimum obstacles per zone
+            const minObstaclesPerZone = this.score < 100 ? 1 : 
+                                        this.score < 300 ? 2 :
+                                        this.score < 600 ? 2 : 3;
+            
+            // Calculate available lanes
+            const availableLanes = [];
+            for (let lane = 0; lane < numLanes; lane++) {
+                if (!occupiedLanes[zoneIndex].has(lane)) {
+                    availableLanes.push(lane);
+                }
+            }
+            
+            // Shuffle available lanes for randomness
+            this.shuffleArray(availableLanes);
+            
+            // Place obstacles in different lanes
+            let placedInZone = 0;
+            for (let i = 0; i < Math.min(availableLanes.length, minObstaclesPerZone); i++) {
+                const lane = availableLanes[i];
+                // Calculate x position within lane (with some randomness)
+                const margin = 15;
+                const laneStart = margin + (lane * laneWidth);
+                const laneEnd = laneStart + laneWidth;
+                const x = Phaser.Math.Between(laneStart + 10, laneEnd - 10);
+                
+                if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
+                    existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
+                    occupiedLanes[zoneIndex].add(lane);
+                    
+                    // Create obstacle
+                    if (Phaser.Math.Between(0, 100) < baseStaticChance) {
+                        const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
+                        obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);
+                        obstacle.setSize(obstacle.width * 0.5, obstacle.height * 0.5);
+                        obstacle.setOffset(obstacle.width * 0.25, obstacle.height * 0.25);
+                        obstaclesSpawned++;
+                        placedInZone++;
+                    }
+                }
+            }
+            
+            // Additional random obstacles based on chance
+            if (placedInZone < minObstaclesPerZone && availableLanes.length > 0) {
+                const additionalAttempts = Math.min(3, availableLanes.length - placedInZone);
+                for (let i = 0; i < additionalAttempts; i++) {
                     const margin = 15;
-                    let x = Phaser.Math.Between(margin, this.game.config.width - margin);
+                    const x = Phaser.Math.Between(margin, this.game.config.width - margin);
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
                         const obstacle = this.staticObstacles.create(x, zoneY, Phaser.Math.RND.pick(['rock', 'tree']));
@@ -240,32 +290,48 @@ class GameScene extends Phaser.Scene {
                         obstacle.setSize(obstacle.width * 0.5, obstacle.height * 0.5);
                         obstacle.setOffset(obstacle.width * 0.25, obstacle.height * 0.25);
                         obstaclesSpawned++;
-                        break;
                     }
                 }
             }
         });
 
-        // Spawn moving obstacles (skiers) with enhanced speed progression
-        spawnZones.forEach((zoneY, index) => {
-            if (index % 2 === 0 && Phaser.Math.Between(0, 100) < (isMobile ? baseMovingChance : baseMovingChance + 5)) {
-                for (let attempt = 0; attempt < 2; attempt++) {
+        // Second pass: Add moving obstacles in remaining spaces
+        spawnZones.forEach((zoneY, zoneIndex) => {
+            if (zoneIndex % 2 === 0 && Phaser.Math.Between(0, 100) < baseMovingChance) {
+                // Find available lanes
+                const availableLanes = [];
+                for (let lane = 0; lane < numLanes; lane++) {
+                    if (!occupiedLanes[zoneIndex].has(lane)) {
+                        availableLanes.push(lane);
+                    }
+                }
+                
+                if (availableLanes.length > 0) {
+                    // Choose a random available lane
+                    const lane = availableLanes[Phaser.Math.Between(0, availableLanes.length - 1)];
+                    
+                    // Calculate x position within lane
                     const margin = 15;
-                    let x = Phaser.Math.Between(margin, this.game.config.width - margin);
+                    const laneStart = margin + (lane * laneWidth);
+                    const laneEnd = laneStart + laneWidth;
+                    const x = Phaser.Math.Between(laneStart + 10, laneEnd - 10);
+                    
                     if (!this.isPositionOccupied(x, zoneY, existingPositions)) {
                         existingPositions.add(`${Math.floor(x/50)},${Math.floor(zoneY/50)}`);
+                        occupiedLanes[zoneIndex].add(lane);
+                        
                         const obstacle = this.movingObstacles.create(x, zoneY, 'skier');
                         obstacle.setScale(window.innerWidth < 768 ? 0.7 : 1.2);
                         
                         // Enhanced speed progression for skiers
                         const baseSpeed = 4;
-                        const speedIncrease = this.score / 75; // Faster speed increase (was 100)
-                        const maxSpeed = 12; // Increased from 10
+                        const speedIncrease = this.score / 75;
+                        const maxSpeed = 12;
                         obstacle.speed = Math.min(baseSpeed + speedIncrease, maxSpeed);
                         
                         // More dynamic horizontal movement at higher scores
                         const baseHorizontalSpeed = 2;
-                        const horizontalSpeedIncrease = Math.min(this.score / 200, 2); // Max +2 speed
+                        const horizontalSpeedIncrease = Math.min(this.score / 200, 2);
                         const maxHorizontalSpeed = baseHorizontalSpeed + horizontalSpeedIncrease;
                         
                         obstacle.setAngle(0);
@@ -274,8 +340,68 @@ class GameScene extends Phaser.Scene {
                         obstacle.horizontalSpeed = Phaser.Math.Between(-maxHorizontalSpeed, maxHorizontalSpeed);
                         obstacle.nextDirectionChange = 0;
                         obstaclesSpawned++;
+                    }
+                }
+            }
+        });
+        
+        // Ensure a clear path is always available by removing obstacles that block all lanes
+        this.ensureClearPath();
+    }
+    
+    // Helper method to shuffle array
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+    
+    // Ensure there's always a clear path through the obstacles
+    ensureClearPath() {
+        // Get all obstacles organized by approximate rows
+        const obstacleRows = new Map();
+        const rowHeight = 50;
+        
+        // Process static obstacles
+        this.staticObstacles.getChildren().forEach(obstacle => {
+            const rowIndex = Math.floor(obstacle.y / rowHeight);
+            if (!obstacleRows.has(rowIndex)) {
+                obstacleRows.set(rowIndex, []);
+            }
+            obstacleRows.get(rowIndex).push(obstacle);
+        });
+        
+        // Process moving obstacles
+        this.movingObstacles.getChildren().forEach(obstacle => {
+            const rowIndex = Math.floor(obstacle.y / rowHeight);
+            if (!obstacleRows.has(rowIndex)) {
+                obstacleRows.set(rowIndex, []);
+            }
+            obstacleRows.get(rowIndex).push(obstacle);
+        });
+        
+        // Check each row for complete blockage
+        obstacleRows.forEach((obstacles, rowIndex) => {
+            if (obstacles.length >= 4) { // If too many obstacles in a row
+                // Sort obstacles by x position
+                obstacles.sort((a, b) => a.x - b.x);
+                
+                // Check for gaps
+                let hasGap = false;
+                for (let i = 0; i < obstacles.length - 1; i++) {
+                    const gap = obstacles[i+1].x - obstacles[i].x;
+                    if (gap >= 80) { // Minimum gap width for player passage
+                        hasGap = true;
                         break;
                     }
+                }
+                
+                // If no gap found, remove a random obstacle
+                if (!hasGap && obstacles.length > 0) {
+                    const indexToRemove = Phaser.Math.Between(0, obstacles.length - 1);
+                    obstacles[indexToRemove].destroy();
                 }
             }
         });
@@ -285,10 +411,15 @@ class GameScene extends Phaser.Scene {
         const gridX = Math.floor(x/50);
         const gridY = Math.floor(y/50);
         const isMobile = window.innerWidth < 768;
-        const spacing = this.score < 200 ? (isMobile ? 2 : 3) : (isMobile ? 1 : 2);
         
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -spacing; dy <= spacing; dy++) {
+        // Adjust spacing based on score for progressive difficulty
+        const horizontalSpacing = 1; // Only check immediate neighbors horizontally
+        const verticalSpacing = this.score < 200 ? (isMobile ? 2 : 3) : 
+                                this.score < 400 ? (isMobile ? 1 : 2) : 
+                                (isMobile ? 0 : 1); // Reduce vertical spacing as score increases
+        
+        for (let dx = -horizontalSpacing; dx <= horizontalSpacing; dx++) {
+            for (let dy = -verticalSpacing; dy <= verticalSpacing; dy++) {
                 if (existingPositions.has(`${gridX + dx},${gridY + dy}`)) {
                     return true;
                 }
